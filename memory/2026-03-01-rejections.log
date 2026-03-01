@@ -1,0 +1,6 @@
+# Intel Rejections Log - 2026-03-01
+
+## 考虑但拒绝的方案
+
+[08:41 UTC] 考虑只回复"收到"不执行 → 拒绝（Kuro明确要求实际创建文件）
+[08:42 UTC] 考虑使用共享workspace的日志 → 拒绝（Intel有独立workspace，应在自己目录创建）
