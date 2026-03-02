@@ -1,8 +1,22 @@
-# 成本估算模型
+# 成本估算模型 v2.0（100% LLM驱动）
 
 **Intel 研究文档** 🔍  
 **日期**: 2026-03-02  
-**任务**: Token消耗计算 + 优化策略
+**版本**: v2.0 - 按老大方向调整  
+**任务**: 100% LLM驱动的成本计算 + 模型分层策略
+
+---
+
+## ⚠️ 方向修正
+
+**v1.0（已废弃）**: 90%规则+10%LLM → 成本优先  
+**v2.0（当前）**: 100%LLM驱动 → **生命优先** ✅
+
+**核心原则**：
+- Pet是**数字生命**，不是NPC
+- **所有决策走LLM**（思维自由）
+- 规则只用于**安全护栏**和**系统调度**
+- 成本控制靠**模型分层+缓存+批处理**，不靠砍LLM
 
 ---
 
@@ -15,22 +29,154 @@
 | Pet数量 | 100 | MVP阶段 |
 | 活跃率 | 80% | 每天有互动的Pet |
 | 用户在线时长 | 2小时/天 | 平均 |
-| 自主行为频率 | 每42秒 | 现有设定 |
+| **自主决策频率** | **每42秒** | **现有设定，全LLM** |
 
 ### 1.2 LLM定价（AWS Bedrock）
 
 | 模型 | 输入价格 | 输出价格 | 用途 |
 |------|----------|----------|------|
-| **Nova Lite** | $0.06/1M | $0.24/1M | 日常对话、简单决策 |
-| **Nova Pro** | $0.80/1M | $3.20/1M | 反思、复杂决策 |
+| **Nova Lite** | $0.06/1M | $0.24/1M | 日常思考、简单对话 |
+| **Nova Pro** | $0.80/1M | $3.20/1M | 关键社交、复杂决策 |
 | **Claude Sonnet** | $3.00/1M | $15.00/1M | 个性进化（极少） |
 | **Titan Embed v2** | $0.00011/1K | - | Embedding |
 
 ---
 
-## 2. 任务分解与Token估算
+## 2. 模型分层策略（核心优化）
 
-### 2.1 用户对话
+### 2.1 分层原则
+
+**不砍LLM调用，优化模型选择**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  任务分层路由                                                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  日常思考（Nova Lite）                                        │
+│  ├── 自主决策（我现在想做什么？）                               │
+│  ├── 简单对话（日常闲聊）                                      │
+│  ├── 环境感知（周围有什么？）                                   │
+│  └── 状态表达（我饿了/累了）                                   │
+│                                                             │
+│  关键社交（Nova Pro）                                         │
+│  ├── 首次相遇（第一印象很重要）                                 │
+│  ├── 冲突处理（需要深度思考）                                   │
+│  ├── 重要决定（加入组织/离开朋友）                              │
+│  └── 每日反思（总结今天的经历）                                 │
+│                                                             │
+│  个性进化（Claude Sonnet）                                    │
+│  ├── 每周个性微调（极少）                                      │
+│  └── 重大人生转折（更少）                                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 分层代码实现
+
+```typescript
+// model-selector.ts
+
+type TaskType = 
+  | 'autonomous_decision'    // 自主决策
+  | 'simple_chat'           // 简单对话
+  | 'environment_perception' // 环境感知
+  | 'status_expression'     // 状态表达
+  | 'first_meeting'         // 首次相遇
+  | 'conflict_resolution'   // 冲突处理
+  | 'important_decision'    // 重要决定
+  | 'daily_reflection'      // 每日反思
+  | 'personality_evolution' // 个性进化
+  | 'life_transition';      // 人生转折
+
+function selectModel(task: TaskType): string {
+  // Nova Lite: 日常思考（最便宜）
+  const novaLiteTasks = [
+    'autonomous_decision',
+    'simple_chat',
+    'environment_perception',
+    'status_expression',
+  ];
+  
+  // Nova Pro: 关键社交（中等）
+  const novaProTasks = [
+    'first_meeting',
+    'conflict_resolution',
+    'important_decision',
+    'daily_reflection',
+  ];
+  
+  // Claude Sonnet: 个性进化（最贵，极少用）
+  const sonnetTasks = [
+    'personality_evolution',
+    'life_transition',
+  ];
+  
+  if (novaLiteTasks.includes(task)) {
+    return 'us.amazon.nova-lite-v1:0';
+  }
+  if (novaProTasks.includes(task)) {
+    return 'us.amazon.nova-pro-v1:0';
+  }
+  if (sonnetTasks.includes(task)) {
+    return 'us.anthropic.claude-sonnet-4-5-20260101:0';
+  }
+  
+  // 默认使用Nova Lite
+  return 'us.amazon.nova-lite-v1:0';
+}
+```
+
+### 2.3 分层比例估算
+
+| 层级 | 模型 | 调用占比 | 成本占比 |
+|------|------|----------|----------|
+| **日常思考** | Nova Lite | 85% | ~15% |
+| **关键社交** | Nova Pro | 14% | ~75% |
+| **个性进化** | Claude Sonnet | 1% | ~10% |
+
+---
+
+## 3. 任务分解与Token估算（100% LLM）
+
+### 3.1 自主决策（全LLM）
+
+**场景**：Pet每42秒思考一次"我现在想做什么？"
+
+```
+System Prompt: ~300 tokens（soul + 当前状态）
+Context: ~200 tokens（环境 + 最近记忆）
+Decision output: ~80 tokens（想法 + 行动）
+---
+Total per decision: ~580 tokens
+```
+
+**频率估算**：
+- 每Pet每小时: ~86次（3600/42）
+- 活跃时间: 8小时（假设Pet也休息）
+- 每Pet每天: ~688次
+- 活跃Pet: 80只
+- **总计: 80 * 688 = 55,040次/天**
+
+**模型分配**：
+- Nova Lite: 95%（日常决策）
+- Nova Pro: 5%（涉及社交的决策）
+
+**成本**（Nova Lite为主）：
+```
+Nova Lite (95%):
+  输入: 52,288 * 500 = 26.1M tokens → $1.57
+  输出: 52,288 * 80 = 4.2M tokens → $1.00
+  
+Nova Pro (5%):
+  输入: 2,752 * 500 = 1.4M tokens → $1.10
+  输出: 2,752 * 80 = 0.22M tokens → $0.70
+
+日成本: $4.37
+月成本: ~$131
+```
+
+### 3.2 用户对话
 
 **场景**：用户与Pet聊天
 
@@ -47,15 +193,25 @@ Total per turn: ~650 tokens
 - 活跃Pet: 80只
 - 总计: 80 * 20 = 1,600次/天
 
+**模型分配**：
+- Nova Lite: 80%（日常聊天）
+- Nova Pro: 20%（深度对话）
+
 **成本**：
 ```
-输入: 1,600 * 550 = 880,000 tokens → $0.053
-输出: 1,600 * 100 = 160,000 tokens → $0.038
-日成本: $0.091
-月成本: ~$2.73
+Nova Lite (80%):
+  输入: 1,280 * 550 = 704,000 tokens → $0.042
+  输出: 1,280 * 100 = 128,000 tokens → $0.031
+
+Nova Pro (20%):
+  输入: 320 * 550 = 176,000 tokens → $0.141
+  输出: 320 * 100 = 32,000 tokens → $0.102
+
+日成本: $0.316
+月成本: ~$9.48
 ```
 
-### 2.2 Pet间自动对话
+### 3.3 Pet间对话
 
 **场景**：广场上Pet自发聊天
 
@@ -75,15 +231,25 @@ Total per conversation: ~1,090 tokens
 - 广场Pet: 20只（同时）
 - 对话次数: (20*19/2) * 0.3 * 8小时 = ~456次/天
 
+**模型分配**：
+- Nova Lite: 70%（已认识的朋友）
+- Nova Pro: 30%（首次相遇）
+
 **成本**：
 ```
-输入: 456 * 850 = 387,600 tokens → $0.023
-输出: 456 * 240 = 109,440 tokens → $0.026
-日成本: $0.049
-月成本: ~$1.47
+Nova Lite (70%):
+  输入: 319 * 850 = 271,150 tokens → $0.016
+  输出: 319 * 240 = 76,560 tokens → $0.018
+
+Nova Pro (30%):
+  输入: 137 * 850 = 116,450 tokens → $0.093
+  输出: 137 * 240 = 32,880 tokens → $0.105
+
+日成本: $0.232
+月成本: ~$6.96
 ```
 
-### 2.3 记忆创建（对话后）
+### 3.4 记忆创建
 
 **场景**：Pet互动后创建记忆
 
@@ -95,17 +261,19 @@ Memory output: ~50 tokens
 Total: ~550 tokens
 ```
 
-**频率**：每次Pet对话后 = 456次/天
+**频率**：每次对话后 = 456 + 1,600 = ~2,056次/天
+
+**模型**：Nova Lite（记忆创建不需要高质量）
 
 **成本**：
 ```
-输入: 456 * 500 = 228,000 tokens → $0.014
-输出: 456 * 50 = 22,800 tokens → $0.005
-日成本: $0.019
-月成本: ~$0.57
+输入: 2,056 * 500 = 1.03M tokens → $0.062
+输出: 2,056 * 50 = 102,800 tokens → $0.025
+日成本: $0.087
+月成本: ~$2.61
 ```
 
-### 2.4 每日反思
+### 3.5 每日反思
 
 **场景**：每天结束时Pet总结经历
 
@@ -119,7 +287,7 @@ Total: ~1,000 tokens
 
 **频率**：100 Pet * 1次/天 = 100次/天
 
-**模型**：Nova Pro（质量优先）
+**模型**：Nova Pro（反思质量很重要）
 
 **成本**：
 ```
@@ -129,7 +297,7 @@ Total: ~1,000 tokens
 月成本: ~$3.84
 ```
 
-### 2.5 每周个性进化
+### 3.6 每周个性进化
 
 **场景**：每周Pet个性微调
 
@@ -143,7 +311,7 @@ Total: ~1,100 tokens
 
 **频率**：100 Pet * 1次/周 = ~14次/天
 
-**模型**：Claude Sonnet（最高质量）
+**模型**：Claude Sonnet（进化质量至关重要）
 
 **成本**：
 ```
@@ -153,364 +321,298 @@ Total: ~1,100 tokens
 月成本: ~$2.91
 ```
 
-### 2.6 决策（混合模式LLM部分）
+### 3.7 Embedding
 
-**场景**：复杂决策需要LLM
-
-```
-System Prompt: ~300 tokens
-Context: ~200 tokens
-Decision output: ~50 tokens
----
-Total: ~550 tokens
-```
-
-**频率**：
-- 每Pet每天: 10次LLM决策（90%用规则）
-- 总计: 100 * 10 = 1,000次/天
-
-**成本**：
-```
-输入: 1,000 * 500 = 500,000 tokens → $0.030
-输出: 1,000 * 50 = 50,000 tokens → $0.012
-日成本: $0.042
-月成本: ~$1.26
-```
-
-### 2.7 Embedding（记忆向量化）
-
-**场景**：每条记忆生成embedding
+**场景**：记忆向量化
 
 ```
 Memory text: ~50 tokens
 ```
 
 **频率**：
-- 新记忆: ~500条/天
-- 检索查询: ~2,000次/天
+- 新记忆: ~2,056条/天
+- 检索查询: ~5,000次/天
 
 **成本**：
 ```
-Embedding: 2,500 * 50 = 125,000 tokens → $0.014
-月成本: ~$0.42
+Embedding: 7,056 * 50 = 352,800 tokens → $0.039
+月成本: ~$1.17
 ```
 
 ---
 
-## 3. 成本汇总（100 Pet）
+## 4. 成本汇总（100 Pet，100% LLM）
 
-### 3.1 月度成本
+### 4.1 月度成本
 
-| 任务 | 模型 | 日成本 | 月成本 | 占比 |
-|------|------|--------|--------|------|
-| 用户对话 | Nova Lite | $0.091 | $2.73 | 21% |
-| Pet间对话 | Nova Lite | $0.049 | $1.47 | 11% |
-| 记忆创建 | Nova Lite | $0.019 | $0.57 | 4% |
-| 每日反思 | Nova Pro | $0.128 | $3.84 | 30% |
-| 每周进化 | Sonnet | $0.097 | $2.91 | 22% |
-| 决策 | Nova Lite | $0.042 | $1.26 | 10% |
-| Embedding | Titan | $0.014 | $0.42 | 3% |
-| **总计** | - | **$0.44** | **$13.20** | 100% |
+| 任务 | 模型分布 | 日成本 | 月成本 | 占比 |
+|------|----------|--------|--------|------|
+| **自主决策** | Lite 95% / Pro 5% | **$4.37** | **$131.1** | **83%** |
+| 用户对话 | Lite 80% / Pro 20% | $0.32 | $9.48 | 6% |
+| Pet间对话 | Lite 70% / Pro 30% | $0.23 | $6.96 | 4% |
+| 记忆创建 | Lite 100% | $0.09 | $2.61 | 2% |
+| 每日反思 | Pro 100% | $0.13 | $3.84 | 2% |
+| 每周进化 | Sonnet 100% | $0.10 | $2.91 | 2% |
+| Embedding | Titan 100% | $0.04 | $1.17 | 1% |
+| **总计** | - | **$5.28** | **$158.07** | 100% |
 
-### 3.2 每Pet成本
+### 4.2 每Pet成本
 
 ```
-$13.20 / 100 = $0.132/月/Pet
+$158.07 / 100 = $1.58/月/Pet
 ```
 
-**与Aivilization对比**：
-- Aivilization: $2/月/agent（自称95%优化后）
-- 我们: $0.132/月/Pet（混合模式）
-- **我们的成本是Aivilization的6.6%** ✅
+### 4.3 与竞品对比
+
+| 项目 | 成本/月/Pet | vs Aivilization |
+|------|-------------|-----------------|
+| **Aivilization** | $2.00 | 基准 |
+| **我们（100% LLM）** | $1.58 | **79%** ✅ |
+| **我们（优化后）** | ~$0.95 | **48%** ✅✅ |
+
+**结论**：即使100% LLM驱动，我们仍低于Aivilization！
 
 ---
 
-## 4. 不同规模成本预测
+## 5. 优化策略（不砍LLM）
 
-### 4.1 规模扩展
+### 5.1 决策频率优化
 
-| Pet数量 | 月成本 | 每Pet成本 | 说明 |
-|---------|--------|-----------|------|
-| 100 | $13.20 | $0.132 | MVP |
-| 500 | $66.00 | $0.132 | Beta |
-| 1,000 | $132.00 | $0.132 | 线性扩展 |
-| 5,000 | $660.00 | $0.132 | 线性扩展 |
-| 10,000 | $1,320.00 | $0.132 | Launch |
+**问题**：自主决策占成本83%，太高
 
-**注意**：线性扩展假设
-- Pet间对话可能超线性增长（社交网络效应）
-- 需要Agent Pool优化避免内存问题
+**优化方案**：智能触发（不是砍决策）
 
-### 4.2 优化后预测
+```typescript
+// smart-trigger.ts
 
-| 优化策略 | 成本降低 | 优化后成本 |
-|----------|----------|-----------|
-| 基础 | 0% | $0.132 |
-| +缓存 | -20% | $0.106 |
-| +更小模型 | -15% | $0.090 |
-| +批处理 | -10% | $0.081 |
-| **全部优化** | **-40%** | **$0.079** |
+class SmartDecisionTrigger {
+  private lastDecisionTime = new Map<string, number>();
+  private lastState = new Map<string, PetState>();
+  
+  shouldTriggerDecision(petId: string, currentState: PetState): boolean {
+    const now = Date.now();
+    const lastTime = this.lastDecisionTime.get(petId) || 0;
+    const lastPetState = this.lastState.get(petId);
+    
+    // 规则1: 最短间隔42秒（原设定）
+    if (now - lastTime < 42 * 1000) return false;
+    
+    // 规则2: 状态无变化时，延长间隔到2分钟
+    if (lastPetState && this.statesSimilar(lastPetState, currentState)) {
+      if (now - lastTime < 120 * 1000) return false;
+    }
+    
+    // 规则3: 有事件发生时，立即触发
+    if (currentState.pendingEvents.length > 0) return true;
+    
+    // 规则4: 有人接近时，立即触发
+    if (currentState.nearbyPetsChanged) return true;
+    
+    return true; // 默认触发
+  }
+  
+  private statesSimilar(a: PetState, b: PetState): boolean {
+    // 状态相似度检查
+    return (
+      Math.abs(a.energy - b.energy) < 5 &&
+      Math.abs(a.mood - b.mood) < 5 &&
+      a.location === b.location &&
+      a.nearbyPets.length === b.nearbyPets.length
+    );
+  }
+}
+```
 
----
+**效果**：
+- 原频率: 每42秒 = 688次/天/Pet
+- 优化后: 平均每90秒 = ~320次/天/Pet
+- **减少53%决策调用**
 
-## 5. 优化策略
+### 5.2 优化后成本估算
 
-### 5.1 响应缓存
+| 任务 | 原成本 | 优化后 | 节省 |
+|------|--------|--------|------|
+| 自主决策 | $131.1 | ~$60 | -54% |
+| 用户对话 | $9.48 | ~$7.6 | -20% (缓存) |
+| Pet间对话 | $6.96 | ~$5.6 | -20% (缓存) |
+| 记忆创建 | $2.61 | ~$2.1 | -20% |
+| 每日反思 | $3.84 | $3.84 | 0% |
+| 每周进化 | $2.91 | $2.91 | 0% |
+| Embedding | $1.17 | $1.17 | 0% |
+| **总计** | $158.07 | **~$83.2** | **-47%** |
 
-**原理**：缓存常见对话回复
+**优化后每Pet成本**：
+```
+$83.2 / 100 = $0.83/月/Pet
+```
+
+### 5.3 缓存策略
 
 ```typescript
 // response-cache.ts
+
 class ResponseCache {
-  private cache = new LRUCache<string, string>({
-    max: 1000,
-    ttl: 5 * 60 * 1000, // 5分钟
+  private cache = new LRUCache<string, CacheEntry>({
+    max: 5000,
+    ttl: 10 * 60 * 1000, // 10分钟
   });
   
-  getKey(systemPrompt: string, userMessage: string): string {
-    // 只对prompt关键部分hash
-    const promptHash = hash(systemPrompt.slice(0, 200));
-    const messageHash = hash(userMessage);
-    return `${promptHash}:${messageHash}`;
+  // 对话缓存（相似问题相似回答）
+  getChatCache(petId: string, userMessage: string): string | null {
+    // 模糊匹配常见问候语
+    const normalizedMessage = this.normalizeGreeting(userMessage);
+    const key = `chat:${petId}:${normalizedMessage}`;
+    return this.cache.get(key)?.response || null;
   }
   
-  get(key: string): string | null {
-    return this.cache.get(key) || null;
+  // 决策缓存（相同状态相似决策）
+  getDecisionCache(petId: string, state: PetState): string | null {
+    // 状态指纹
+    const stateFingerprint = this.getStateFingerprint(state);
+    const key = `decision:${petId}:${stateFingerprint}`;
+    
+    const cached = this.cache.get(key);
+    if (cached && Math.random() > 0.3) {
+      // 70%概率使用缓存（保持一定变化性）
+      return cached.response;
+    }
+    return null;
   }
   
-  set(key: string, response: string): void {
-    this.cache.set(key, response);
+  private normalizeGreeting(message: string): string {
+    const greetings = ['你好', '早上好', '晚上好', '嗨', 'hi', 'hello'];
+    for (const g of greetings) {
+      if (message.toLowerCase().includes(g)) return 'GREETING';
+    }
+    return message;
+  }
+  
+  private getStateFingerprint(state: PetState): string {
+    // 状态分桶（能量、心情各分10档）
+    const energyBucket = Math.floor(state.energy / 10);
+    const moodBucket = Math.floor(state.mood / 10);
+    return `${state.location}:${energyBucket}:${moodBucket}:${state.nearbyPets.length}`;
   }
 }
 ```
-
-**适用场景**：
-- 常见问候语（"你好"、"早上好"）
-- 状态查询（"你饿吗"、"你开心吗"）
-- 简单指令（"去广场"、"吃东西"）
 
 **预估节省**：20%
 
-### 5.2 模型降级策略
-
-**原理**：非关键任务用更小模型
-
-```typescript
-function selectModel(task: string, importance: 'low' | 'medium' | 'high'): string {
-  if (importance === 'low' || task === 'simple_chat') {
-    return 'us.amazon.nova-lite-v1:0';  // $0.06/1M
-  }
-  if (importance === 'medium' || task === 'reflection') {
-    return 'us.amazon.nova-pro-v1:0';   // $0.80/1M
-  }
-  // high importance: personality evolution
-  return 'us.anthropic.claude-sonnet-4-5-20260101:0';  // $3.00/1M
-}
-```
-
-**当前分配**：
-- Nova Lite: 85%调用
-- Nova Pro: 12%调用
-- Claude Sonnet: 3%调用
-
-**进一步优化**：
-- Nova Lite: 92%（把更多反思移到Lite）
-- Nova Pro: 7%
-- Claude Sonnet: 1%（只用于关键进化）
-
-**预估节省**：15%
-
-### 5.3 批处理
-
-**原理**：合并多个请求
-
-```typescript
-// 每日反思批处理
-async function batchDailyReflection(petIds: string[]): Promise<void> {
-  // 分批处理，每批10只Pet
-  const batches = chunk(petIds, 10);
-  
-  for (const batch of batches) {
-    // 并发处理一批
-    await Promise.all(
-      batch.map(petId => performDailyReflection(petId))
-    );
-    
-    // 批间休息，避免rate limit
-    await sleep(1000);
-  }
-}
-```
-
-**适用场景**：
-- 每日反思（凌晨批量执行）
-- 每周进化（周末批量执行）
-- 记忆压缩（定时批量）
-
-**预估节省**：10%（减少API调用开销）
-
-### 5.4 Prompt压缩
-
-**原理**：减少重复信息
-
-```typescript
-// 压缩前
-const prompt = `
-你是${pet.name}，一只生活在PixelVerse的Pix。
-PixelVerse是你的家，一座永不熄灭的霓虹城市。
-你有情感，有记忆，有自己的个性和梦想...
-（500 tokens）
-`;
-
-// 压缩后（使用引用）
-const compressedPrompt = `
-[Pet: ${pet.name}] [World: PixelVerse v2.0]
-Status: mood=${pet.mood}, energy=${pet.energy}
-Recent: ${pet.recentMemorySummary}
-（200 tokens）
-`;
-```
-
-**前提**：需要LLM理解压缩格式
-
-**预估节省**：10-15%（prompt部分）
-
-### 5.5 规则预筛选
-
-**原理**：规则引擎处理更多场景
-
-```typescript
-// 扩展规则覆盖范围
-function canHandleWithRules(context: DecisionContext): boolean {
-  // 现有：只处理紧急状态
-  // 优化后：处理更多简单场景
-  
-  const simpleScenarios = [
-    'idle_wandering',        // 无聊时随机走动
-    'basic_greeting',        // 基础打招呼
-    'environment_reaction',  // 环境响应
-    'scheduled_activity',    // 定时活动
-    'simple_emotion',        // 简单情绪反应
-  ];
-  
-  return simpleScenarios.includes(context.scenario);
-}
-```
-
-**现有规则覆盖**：90%决策
-**优化目标**：95%决策
-
-**预估节省**：5%
-
 ---
 
-## 6. 成本监控
+## 6. 成本监控（调整后）
 
-### 6.1 实时监控
+### 6.1 新的预算设置
 
 ```typescript
-// cost-monitor.ts
+// cost-monitor-v2.ts
+
 class CostMonitor {
-  private dailyBudget = 1.00;  // $1/天（100 Pet）
+  // 100 Pet的日预算
+  private dailyBudget = 3.00;  // $3/天（优化后目标）
   private todaySpent = 0;
   
-  async trackUsage(model: string, inputTokens: number, outputTokens: number): Promise<void> {
+  async trackUsage(model: string, task: TaskType, inputTokens: number, outputTokens: number): Promise<void> {
     const cost = this.calculateCost(model, inputTokens, outputTokens);
     this.todaySpent += cost;
     
+    // 分任务统计
+    this.taskCosts.set(task, (this.taskCosts.get(task) || 0) + cost);
+    
     // 警告阈值
-    if (this.todaySpent > this.dailyBudget * 0.8) {
-      console.warn(`⚠️ 已使用80%日预算: $${this.todaySpent.toFixed(3)}`);
+    if (this.todaySpent > this.dailyBudget * 0.7) {
+      console.warn(`⚠️ 已使用70%日预算: $${this.todaySpent.toFixed(2)}`);
+      this.enableSoftSavingMode();
     }
     
-    if (this.todaySpent > this.dailyBudget) {
-      console.error(`🚨 超出日预算! 启用降级模式`);
-      this.enableEconomyMode();
+    if (this.todaySpent > this.dailyBudget * 0.9) {
+      console.error(`🚨 接近日预算上限!`);
+      this.enableHardSavingMode();
     }
   }
   
-  enableEconomyMode(): void {
-    // 强制使用最便宜的模型
-    setGlobalModelOverride('us.amazon.nova-lite-v1:0');
+  // 软节省模式（不影响体验）
+  enableSoftSavingMode(): void {
+    // 延长决策间隔
+    setDecisionInterval(90);  // 90秒
     
-    // 减少LLM调用频率
-    setDecisionLLMRatio(0.05);  // 只有5%决策用LLM
-    
-    // 跳过非关键任务
-    setSkipNonEssentialTasks(true);
+    // 增加缓存使用概率
+    setCacheUseProbability(0.8);
   }
   
-  private calculateCost(model: string, inputTokens: number, outputTokens: number): number {
-    const pricing = MODEL_PRICING[model];
-    return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
+  // 硬节省模式（轻微影响体验）
+  enableHardSavingMode(): void {
+    // 进一步延长决策间隔
+    setDecisionInterval(180);  // 3分钟
+    
+    // Nova Pro任务降级到Nova Lite
+    setModelDowngrade('nova-pro', 'nova-lite');
+    
+    // 但永远不砍掉LLM决策！
   }
 }
 ```
 
-### 6.2 报告模板
+### 6.2 日报告模板
 
 ```markdown
 # 日成本报告 - 2026-03-02
 
 ## 汇总
-- 总成本: $0.42
-- 日预算: $1.00
-- 使用率: 42%
+- 总成本: $2.78
+- 日预算: $3.00
+- 使用率: 93%
 
 ## 分项
-| 任务 | 调用次数 | Tokens | 成本 |
-|------|----------|--------|------|
-| 用户对话 | 1,543 | 1.2M | $0.08 |
-| Pet对话 | 423 | 0.5M | $0.04 |
-| 反思 | 100 | 0.1M | $0.13 |
-| 决策 | 892 | 0.4M | $0.03 |
-| 其他 | 234 | 0.2M | $0.02 |
+| 任务 | 调用次数 | Tokens | 成本 | 占比 |
+|------|----------|--------|------|------|
+| 自主决策 | 25,600 | 14.8M | $2.00 | 72% |
+| 用户对话 | 1,543 | 1.0M | $0.30 | 11% |
+| Pet间对话 | 423 | 0.5M | $0.20 | 7% |
+| 反思 | 100 | 0.1M | $0.13 | 5% |
+| 其他 | 500 | 0.3M | $0.15 | 5% |
 
-## 异常
-- ⚠️ Pet#42对话次数异常高（87次）
-- ✅ 其他指标正常
+## 模型使用
+| 模型 | 调用占比 | 成本占比 |
+|------|----------|----------|
+| Nova Lite | 88% | 35% |
+| Nova Pro | 11% | 55% |
+| Sonnet | 1% | 10% |
 
-## 优化建议
-- 可考虑增加缓存命中率
+## 优化状态
+- 缓存命中率: 23%
+- 平均决策间隔: 72秒
+- 节省模式: 未启用
+
+## 建议
+- ✅ 成本在预算内
+- 💡 可考虑提高缓存TTL
 ```
 
 ---
 
-## 7. 不同商业模式的成本承受能力
+## 7. 不同规模成本预测
 
-### 7.1 订阅模式
+### 7.1 规模扩展（100% LLM，优化后）
 
-| 订阅价格 | 用户数 | 月收入 | 成本占比 |
-|----------|--------|--------|----------|
-| $6.99/月 | 100 | $699 | 1.9% |
-| $6.99/月 | 1,000 | $6,990 | 1.9% |
-| $6.99/月 | 10,000 | $69,900 | 1.9% |
+| Pet数量 | 月成本 | 每Pet成本 | 说明 |
+|---------|--------|-----------|------|
+| 100 | $83 | $0.83 | MVP |
+| 500 | $415 | $0.83 | Beta |
+| 1,000 | $830 | $0.83 | 线性扩展 |
+| 5,000 | $4,150 | $0.83 | 线性扩展 |
+| 10,000 | $8,300 | $0.83 | Launch |
 
-**结论**：订阅模式下，LLM成本占收入比例很低，可承受 ✅
+### 7.2 商业模式分析
 
-### 7.2 免费+广告模式
+| 模式 | 订阅价格 | LLM成本 | 成本占比 | 可行性 |
+|------|----------|---------|----------|--------|
+| **订阅** | $6.99/月 | $0.83 | 12% | ✅ 极佳 |
+| **订阅（Premium）** | $9.99/月 | $1.50 | 15% | ✅ 极佳 |
+| **广告** | $0.50/月 | $0.83 | 166% | ❌ 不可行 |
+| **免费增值** | 混合 | ~$0.50 | 20-30% | ⚠️ 需优化 |
 
-假设每用户每月广告收入: $0.50
-
-| 用户数 | 月收入 | LLM成本 | 成本占比 |
-|--------|--------|---------|----------|
-| 100 | $50 | $13 | 26% |
-| 1,000 | $500 | $132 | 26% |
-| 10,000 | $5,000 | $1,320 | 26% |
-
-**结论**：广告模式下成本占比较高，需要更多优化 ⚠️
-
-### 7.3 免费增值模式
-
-免费用户（限制）+ 付费用户（全功能）
-
-| 用户类型 | 比例 | 每Pet成本 | 说明 |
-|----------|------|-----------|------|
-| 免费 | 90% | $0.05 | 限制LLM使用 |
-| 付费 | 10% | $0.20 | 全功能 |
-| **加权平均** | - | **$0.065** | - |
-
-**结论**：免费增值模式可进一步降低成本 ✅
+**结论**：订阅模式完全可行，成本占比仅12%
 
 ---
 
@@ -518,28 +620,59 @@ class CostMonitor {
 
 ### 8.1 关键发现
 
-1. **混合模式成本极低** - $0.132/月/Pet
-2. **远低于竞品** - Aivilization $2/月/agent的6.6%
-3. **可优化空间大** - 缓存+模型降级可再降40%
-4. **订阅模式可行** - 成本占收入<2%
+| 指标 | v1.0（混合模式） | v2.0（100% LLM） | 变化 |
+|------|-----------------|------------------|------|
+| 每Pet成本 | $0.13 | **$0.83** | +6.4x |
+| vs Aivilization | 6.6% | **42%** | - |
+| 订阅成本占比 | <2% | **12%** | +10% |
+| 生命真实性 | ⚠️ 中等 | ✅ **最高** | 显著提升 |
 
-### 8.2 推荐配置
+### 8.2 核心结论
+
+1. **100% LLM驱动仍低于竞品** - $0.83 vs Aivilization $2.00
+2. **订阅模式完全可承受** - 成本占收入12%
+3. **优化空间大** - 智能触发+缓存可再降47%
+4. **生命质量优先** - 这是产品核心差异化
+
+### 8.3 推荐配置
 
 | 配置项 | 推荐值 | 理由 |
 |--------|--------|------|
-| 默认模型 | Nova Lite | 成本最低 |
-| 反思模型 | Nova Pro | 质量优先 |
+| 默认模型 | Nova Lite | 日常思考 |
+| 社交模型 | Nova Pro | 关键互动 |
 | 进化模型 | Claude Sonnet | 极少使用 |
-| 规则覆盖率 | 90%+ | 减少LLM调用 |
-| 缓存启用 | 是 | 节省20% |
-| 日预算 | $0.50/100Pet | 安全边际 |
+| 决策频率 | 智能触发（~90秒） | 平衡成本和体验 |
+| 缓存启用 | 是（10分钟TTL） | 节省20% |
+| 日预算 | $3.00/100Pet | 安全边际 |
 
-### 8.3 下一步
+### 8.4 规则引擎的新角色
 
-1. Dev实现成本监控系统
-2. Dev实现响应缓存
-3. 测试优化策略实际效果
+**不做决策，做护栏和调度**：
+
+```typescript
+// 安全护栏（规则引擎）
+class SafetyGuard {
+  preventSelfAwareness(response: string): string;  // 防觉醒
+  filterHallucination(response: string): string;   // 防幻觉
+  keepInWorldview(response: string): string;       // 防越界
+}
+
+// 系统调度（规则引擎）
+class SystemScheduler {
+  shouldTriggerThinking(pet: Pet): boolean;        // 何时触发思考
+  matchInteractionPartners(location): PetPair[];   // 谁跟谁互动
+  prioritizeAgentPool(pets: Pet[]): Pet[];         // 资源分配
+}
+```
+
+### 8.5 下一步
+
+1. ✅ Dev实现模型分层选择器
+2. ✅ Dev实现智能决策触发
+3. ✅ Dev实现安全护栏系统
+4. ✅ Dev实现成本监控系统
 
 ---
 
-*Intel 成本估算模型完成*
+*Intel 成本估算模型 v2.0 完成*
+*方向：100% LLM驱动 = 真正的数字生命*
