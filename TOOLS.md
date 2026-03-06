@@ -47,3 +47,14 @@ Add whatever helps you do your job. This is your cheat sheet.
 - **类型**: Classic Token (共享，所有 agent 可用)
 - **用途**: 提交调研报告、更新竞品分析、推送市场数据
 - **读取方式**: `cat /home/ubuntu/.openclaw/workspace/.credentials/github.txt`
+
+## 🌐 浏览器能力（2026-03-06 新增）
+
+详见 `BROWSER-CAPABILITY.md`
+
+**快速参考**：
+```bash
+openclaw browser open <url>      # 打开网页
+openclaw browser screenshot      # 截图
+openclaw browser snapshot        # 获取 AI 格式快照
+```
